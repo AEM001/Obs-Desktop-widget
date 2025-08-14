@@ -9,7 +9,7 @@ const DATE_OFFSET_DAYS = 0; // 0=Today, -1=Yesterday
 export const className = `
   right: 20px;
   top: 20px;
-  width: 480px;
+  width: 380px;
   max-height: 75vh;
   background: linear-gradient(145deg, rgba(240, 248, 255, 0.95), rgba(230, 245, 255, 0.98));
   -webkit-backdrop-filter: blur(20px);
@@ -99,7 +99,8 @@ function PlanInner() {
   const onSave = async () => {
     try {
       setSaving(true);
-      await savePlan(date, draft);
+      const formattedContent = formatAsTasks(draft);
+      await savePlan(date, formattedContent);
       setSavedAt(new Date().toLocaleTimeString());
     } catch (e) {
       setState((s) => ({ ...s, error: String(e) }));
@@ -141,16 +142,15 @@ function PlanInner() {
     }
   };
 
-  const formatAsTasks = () => {
-    const lines = (draft || "").split(/\r?\n/);
+  const formatAsTasks = (content) => {
+    const lines = (content || "").split(/\r?\n/);
     const out = lines.map((ln) => {
       if (/^\s*$/.test(ln)) return "";
       if (/^\s*-\s*\[[ xX]\]/.test(ln)) return ln;
       if (/^\s*-\s+/.test(ln)) return ln.replace(/^\s*-\s+/, "- [ ] ");
       return `- [ ] ${ln}`;
     }).join("\n");
-    setDraft(out);
-    setHasUnsavedChanges(true);
+    return out;
   };
 
   const openInObsidian = async () => {
@@ -206,7 +206,7 @@ function PlanInner() {
             <Btn onClick={() => setEditing(true)}>Edit</Btn>
             {state.file && (
               <Btn onClick={openInObsidian} className="btn-obsidian" title="Open in Obsidian">
-                📝 Obsidian
+                Obsidian
               </Btn>
             )}
           </>
@@ -221,7 +221,6 @@ function PlanInner() {
               setDraft(state.content || ""); 
               setHasUnsavedChanges(false);
             }} className="btn-secondary">Cancel</Btn>
-            <Btn onClick={formatAsTasks} className="btn-secondary">Format as Tasks</Btn>
           </>
         )}
       </div>
@@ -230,9 +229,7 @@ function PlanInner() {
 
   const infoBar = (
     <div className="info-bar">
-      {state.file && <div className="info-file"><code>{state.file}</code></div>}
       {state.error && <div className="info-error">Error: {state.error}</div>}
-      {savedAt && <div className="info-saved">Last saved: {savedAt}</div>}
       {!state.exists && <div className="info-tip">Tip: File does not exist. It will be created on save.</div>}
     </div>
   );
@@ -272,7 +269,7 @@ function PlanInner() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 16px 20px;
+          padding: 8px 20px;
           background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.08));
           border-bottom: 1px solid rgba(59, 130, 246, 0.15);
           backdrop-filter: blur(10px);
@@ -370,25 +367,18 @@ function PlanInner() {
           transform: translateY(0px) rotate(360deg);
         }
         .content-area {
-          padding: 16px 20px;
+          padding: 10px 10px;
           overflow-y: auto;
           flex-grow: 1;
           background: rgba(255, 255, 255, 0.3);
         }
         .info-bar {
-          padding: 0 0 12px;
+          padding: 0 0 8px;
           font-size: 11px;
           opacity: 0.8;
           display: flex;
           flex-direction: column;
           gap: 4px;
-        }
-        .info-file {
-          background: rgba(59, 130, 246, 0.1);
-          color: #1e40af;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-family: "SF Mono", "Monaco", monospace;
         }
         .info-error { 
           color: #dc2626; 
@@ -421,9 +411,9 @@ function PlanInner() {
         .task-item {
           display: flex;
           align-items: flex-start;
-          gap: 12px;
+          gap: 10px;
           margin-bottom: 4px;
-          padding: 8px 10px;
+          padding: 6px 8px;
           border-radius: 8px;
           cursor: pointer;
           transition: all 0.2s ease;
@@ -451,10 +441,12 @@ function PlanInner() {
           accent-color: #3b82f6;
         }
         .task-text { 
-          white-space: pre-wrap; 
-          flex-grow: 1;
-          line-height: 1.4;
-          color: #1e293b;
+            white-space: pre-wrap; 
+            flex-grow: 1;
+            line-height: 1.4;
+            color: #1e293b;
+            font-size: 14px;
+            font-family: "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
         }
         .bullet-item { 
           white-space: pre-wrap;
