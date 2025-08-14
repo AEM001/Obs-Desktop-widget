@@ -9,19 +9,25 @@ const DATE_OFFSET_DAYS = 0; // 0=Today, -1=Yesterday
 export const className = `
   right: 20px;
   top: 20px;
-  width: 460px;
-  max-height: 70vh;
-  background: rgba(28, 28, 30, 0.75);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 14px;
-  color: #fefefe;
+  width: 480px;
+  max-height: 75vh;
+  background: linear-gradient(145deg, rgba(240, 248, 255, 0.95), rgba(230, 245, 255, 0.98));
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-radius: 18px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #1e293b;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   font-size: 13px;
   line-height: 1.5;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 
+    0 20px 40px rgba(59, 130, 246, 0.15),
+    0 8px 16px rgba(59, 130, 246, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: all 0.3s ease;
 `;
 export const refreshFrequency = false; // Use manual refresh
 
@@ -68,24 +74,33 @@ function PlanInner() {
   const [date, setDate] = React.useState(todayWithOffset());
   const [saving, setSaving] = React.useState(false);
   const [savedAt, setSavedAt] = React.useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
 
   const load = React.useCallback(async () => {
     try {
       if (!saving) setState((s) => ({ ...s, loading: true, error: "" }));
       const data = await fetchPlan(date);
       setState({ loading: false, error: "", ...data });
-      setDraft(data.content || "");
-      setEditing(false);
+      // 只在非编辑状态下更新草稿，避免覆盖用户正在编辑的内容
+      if (!editing) {
+        setDraft(data.content || "");
+        setHasUnsavedChanges(false);
+      }
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: String(e), file: "", content: "", exists: false, empty: true }));
     }
-  }, [date, saving]);
+  }, [date, saving, editing]);
 
   React.useEffect(() => {
     load();
-    const timer = setInterval(load, 60000); // Auto-refresh every 60s
+    // 只在非编辑状态下自动刷新，避免丢失编辑内容
+    const timer = setInterval(() => {
+      if (!editing) {
+        load();
+      }
+    }, 60000); // Auto-refresh every 60s only when not editing
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, editing]);
 
   const onSave = async () => {
     try {
@@ -97,6 +112,7 @@ function PlanInner() {
     } finally {
       setSaving(false);
       setEditing(false);
+      setHasUnsavedChanges(false);
       await load();
     }
   };
@@ -140,7 +156,38 @@ function PlanInner() {
       return `- [ ] ${ln}`;
     }).join("\n");
     setDraft(out);
+    setHasUnsavedChanges(true);
   };
+
+  const openInObsidian = async () => {
+    if (!state.file) return;
+    
+    // 从完整路径提取vault名称和相对路径
+    // 例如: /Users/Mac/Documents/Albert-obs/DailyNotes/24/2024-01-15.md
+    // 提取: vault=Albert-obs, file=DailyNotes/24/2024-01-15.md
+    const vaultMatch = state.file.match(/\/([^\/]+)\/DailyNotes\//);
+    const vaultName = vaultMatch ? vaultMatch[1] : "Albert-obs";
+    
+    const relativePathMatch = state.file.match(/DailyNotes\/.*\.md$/);
+    const relativePath = relativePathMatch ? relativePathMatch[0] : "";
+    
+    if (relativePath) {
+      const obsidianUri = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(relativePath)}`;
+      const cmd = `open "${obsidianUri}"`;
+      try {
+        await run(cmd);
+      } catch (e) {
+        console.error("Failed to open in Obsidian:", e);
+      }
+    }
+  };
+
+  // 检测草稿变化
+  React.useEffect(() => {
+    if (editing) {
+      setHasUnsavedChanges(draft !== (state.content || ""));
+    }
+  }, [draft, state.content, editing]);
 
   // --- Render ---
 
@@ -150,14 +197,33 @@ function PlanInner() {
 
   const header = (
     <div className="header">
-      <strong># Plan · {date}</strong>
+      <div className="header-title">
+        <strong># Plan · {date}</strong>
+        {editing && hasUnsavedChanges && (
+          <span className="unsaved-indicator">● Unsaved changes</span>
+        )}
+      </div>
       <div className="controls">
         {!editing ? (
-          <Btn onClick={() => setEditing(true)}>Edit</Btn>
+          <>
+            <Btn onClick={() => setEditing(true)}>Edit</Btn>
+            {state.file && (
+              <Btn onClick={openInObsidian} className="btn-obsidian" title="Open in Obsidian">
+                📝 Obsidian
+              </Btn>
+            )}
+          </>
         ) : (
           <>
             <Btn onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Btn>
-            <Btn onClick={() => { setEditing(false); setDraft(state.content || ""); }} className="btn-secondary">Cancel</Btn>
+            <Btn onClick={() => { 
+              if (hasUnsavedChanges && !confirm("You have unsaved changes. Are you sure you want to cancel?")) {
+                return;
+              }
+              setEditing(false); 
+              setDraft(state.content || ""); 
+              setHasUnsavedChanges(false);
+            }} className="btn-secondary">Cancel</Btn>
             <Btn onClick={formatAsTasks} className="btn-secondary">Format as Tasks</Btn>
           </>
         )}
@@ -209,70 +275,211 @@ function PlanInner() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 12px 16px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          padding: 16px 20px;
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.08));
+          border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+          backdrop-filter: blur(10px);
           flex-shrink: 0;
         }
-        .controls { display: flex; gap: 8px; }
+        .header-title {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .header strong {
+          font-size: 14px;
+          font-weight: 600;
+          background: linear-gradient(135deg, #1e40af, #3b82f6);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        .unsaved-indicator {
+          font-size: 11px;
+          color: #f59e0b;
+          font-weight: 500;
+          opacity: 0.9;
+          animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 0.9; }
+          50% { opacity: 0.6; }
+        }
+        .controls { 
+          display: flex; 
+          gap: 10px; 
+        }
         .btn {
           cursor: pointer;
-          background: rgba(255, 255, 255, 0.15);
-          border: none;
-          color: #fefefe;
-          border-radius: 7px;
-          padding: 4px 10px;
+          background: linear-gradient(135deg, #3b82f6, #2563eb);
+          border: 1px solid rgba(59, 130, 246, 0.3);
+          color: #ffffff;
+          border-radius: 8px;
+          padding: 6px 12px;
           font-size: 12px;
           font-weight: 500;
-          transition: background 0.2s ease;
+          transition: all 0.2s ease;
+          backdrop-filter: blur(10px);
+          box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
         }
-        .btn:hover { background: rgba(255, 255, 255, 0.25); }
-        .btn:active { background: rgba(255, 255, 255, 0.1); }
-        .btn.btn-secondary { background: rgba(255, 255, 255, 0.08); }
+        .btn:hover { 
+          background: linear-gradient(135deg, #2563eb, #1d4ed8);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+        }
+        .btn:active { 
+          background: linear-gradient(135deg, #1d4ed8, #1e40af);
+          transform: translateY(0px);
+        }
+        .btn.btn-secondary { 
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.08));
+          border: 1px solid rgba(59, 130, 246, 0.2);
+          color: #3b82f6;
+        }
+        .btn.btn-secondary:hover {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 197, 253, 0.12));
+          color: #2563eb;
+        }
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none !important;
+        }
+        .btn.btn-obsidian {
+          background: linear-gradient(135deg, #7c3aed, #6d28d9);
+          border: 1px solid rgba(124, 58, 237, 0.3);
+          color: #ffffff;
+        }
+        .btn.btn-obsidian:hover {
+          background: linear-gradient(135deg, #6d28d9, #5b21b6);
+          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+        }
         .content-area {
-          padding: 12px 16px;
+          padding: 16px 20px;
           overflow-y: auto;
           flex-grow: 1;
+          background: rgba(255, 255, 255, 0.3);
         }
         .info-bar {
-          padding: 0 16px 8px;
+          padding: 0 0 12px;
           font-size: 11px;
-          opacity: 0.6;
+          opacity: 0.8;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
         }
-        .info-error { color: #ffb4b4; }
-        .loading, .empty-state { padding: 20px; text-align: center; opacity: 0.7; }
+        .info-file {
+          background: rgba(59, 130, 246, 0.1);
+          color: #1e40af;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-family: "SF Mono", "Monaco", monospace;
+        }
+        .info-error { 
+          color: #dc2626; 
+          background: rgba(220, 38, 38, 0.1);
+          padding: 6px 10px;
+          border-radius: 6px;
+          border-left: 3px solid #dc2626;
+        }
+        .info-saved {
+          color: #059669;
+          background: rgba(5, 150, 105, 0.1);
+          padding: 4px 8px;
+          border-radius: 6px;
+        }
+        .info-tip {
+          color: #3b82f6;
+          background: rgba(59, 130, 246, 0.1);
+          padding: 6px 10px;
+          border-radius: 6px;
+          border-left: 3px solid #3b82f6;
+        }
+        .loading, .empty-state { 
+          padding: 30px; 
+          text-align: center; 
+          opacity: 0.7;
+          font-style: italic;
+          color: #64748b;
+        }
         
         .task-item {
           display: flex;
           align-items: flex-start;
-          gap: 10px;
-          margin-bottom: 2px;
-          padding: 4px 6px;
-          border-radius: 6px;
+          gap: 12px;
+          margin-bottom: 4px;
+          padding: 8px 10px;
+          border-radius: 8px;
           cursor: pointer;
-          transition: background 0.2s ease;
+          transition: all 0.2s ease;
+          background: rgba(255, 255, 255, 0.5);
+          border: 1px solid rgba(59, 130, 246, 0.1);
         }
-        .task-item:hover { background: rgba(255, 255, 255, 0.08); }
+        .task-item:hover { 
+          background: rgba(59, 130, 246, 0.1);
+          border: 1px solid rgba(59, 130, 246, 0.2);
+          transform: translateX(2px);
+        }
+        .task-item.is-checked {
+          opacity: 0.6;
+          background: rgba(148, 163, 184, 0.1);
+        }
         .task-item.is-checked .task-text {
-          opacity: 0.5;
           text-decoration: line-through;
+          color: #64748b;
         }
         .task-item input[type="checkbox"] {
-          margin-top: 3px;
-          pointer-events: none; /* Clicks are handled by the parent div */
+          margin-top: 2px;
+          pointer-events: none;
+          width: 16px;
+          height: 16px;
+          accent-color: #3b82f6;
         }
-        .task-text, .bullet-item, .text-line { white-space: pre-wrap; }
+        .task-text { 
+          white-space: pre-wrap; 
+          flex-grow: 1;
+          line-height: 1.4;
+          color: #1e293b;
+        }
+        .bullet-item { 
+          white-space: pre-wrap;
+          padding: 4px 0;
+          margin-left: 8px;
+          color: #475569;
+        }
+        .text-line { 
+          white-space: pre-wrap;
+          padding: 2px 0;
+          line-height: 1.4;
+          color: #334155;
+        }
         
         textarea.editor {
           width: 100%;
-          min-height: 240px;
-          background: rgba(0,0,0,0.2);
-          color: #fefefe;
-          border: 1px solid rgba(255,255,255,0.15);
-          border-radius: 8px;
-          padding: 10px;
+          min-height: 280px;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(248, 250, 252, 0.9));
+          color: #1e293b;
+          border: 1px solid rgba(59, 130, 246, 0.3);
+          border-radius: 12px;
+          padding: 16px;
           outline: none;
-          font-family: "SF Mono", "Monaco", monospace;
-          font-size: 12px;
+          font-family: "SF Mono", "Monaco", "Consolas", monospace;
+          font-size: 13px;
+          line-height: 1.5;
+          resize: vertical;
+          transition: all 0.2s ease;
+          backdrop-filter: blur(10px);
+          box-shadow: inset 0 2px 4px rgba(59, 130, 246, 0.05);
+        }
+        textarea.editor:focus {
+          border-color: #3b82f6;
+          box-shadow: 
+            0 0 0 3px rgba(59, 130, 246, 0.1),
+            inset 0 2px 4px rgba(59, 130, 246, 0.05);
+        }
+        textarea.editor::placeholder {
+          color: #94a3b8;
+          font-style: italic;
         }
       `}</style>
       {header}
