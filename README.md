@@ -2,11 +2,14 @@
 
 > 将Obsidian的每日计划无缝集成到macOS桌面，实现所见即所得的TODO管理
 
+<img src="./Screenshot%202025-08-14%20at%2015.08.26.png" alt="Obsidian每日计划桌面小组件预览" width="350"/>
+
 ## 🎯 项目概述
 
 这是一个优雅的全栈解决方案，通过 **Übersicht小组件** + **Python FastAPI后端**，将Obsidian的每日计划文件可视化到macOS桌面。告别频繁切换应用的繁琐，直接在桌面完成待办事项管理。
 
 ### 核心特性
+
 - ✅ **实时同步**：桌面小组件与Obsidian文件实时同步
 - 🎯 **Markdown支持**：原生支持 `- [ ]` 任务语法
 - 🔒 **安全可靠**：本地运行，数据完全私有
@@ -24,6 +27,7 @@
 ```
 
 ### 技术栈详解
+
 - **前端**：Übersicht Widget (React JSX)
 - **后端**：FastAPI (uvicorn) + Python 3.x
 - **存储**：Markdown文件 (Obsidian Daily Notes)
@@ -45,6 +49,7 @@ brew install --cask ubersicht
 ### 2. 文件部署
 
 #### 后端服务部署
+
 ```bash
 # 创建项目目录
 mkdir -p ~/obsidian-plan-server
@@ -55,6 +60,7 @@ cp /path/to/obs_plan_server.py ./
 ```
 
 #### LaunchAgent配置（自动启动）
+
 ```bash
 # 复制plist文件
 sudo cp local.obsidian.planserver.plist ~/Library/LaunchAgents/
@@ -66,6 +72,7 @@ launchctl kickstart gui/$(id -u)/local.obsidian.planserver
 ```
 
 #### 前端小组件部署
+
 ```bash
 # 创建小组件目录
 mkdir -p ~/Library/Application\ Support/Übersicht/widgets/ObsidianPlan.widget
@@ -106,6 +113,7 @@ launchctl kickstart -k gui/$(id -u)/local.obsidian.planserver
 ### 🔍 故障排查
 
 #### 查看日志
+
 ```bash
 # 实时查看服务日志
 tail -f /tmp/planserver.out.log
@@ -116,6 +124,7 @@ curl -H "X-Auth: your-secret-token" http://127.0.0.1:8787/planning?date=2025-08-
 ```
 
 #### 常见问题
+
 - **端口冲突**：检查是否已有服务运行 `lsof -i :8787`
 - **权限问题**：确保plist文件权限正确 `chmod 644`
 - **Python路径**：更新plist中的conda路径为你的实际路径
@@ -125,6 +134,7 @@ curl -H "X-Auth: your-secret-token" http://127.0.0.1:8787/planning?date=2025-08-
 ### Obsidian集成最佳实践
 
 #### 每日计划模板
+
 在Obsidian中创建每日计划模板：
 
 ```markdown
@@ -149,7 +159,9 @@ curl -H "X-Auth: your-secret-token" http://127.0.0.1:8787/planning?date=2025-08-
 ```
 
 #### 快捷键增强
+
 为Obsidian添加快捷键生成每日计划：
+
 ```json
 {
   "一键创建今日计划": {
@@ -162,6 +174,7 @@ curl -H "X-Auth: your-secret-token" http://127.0.0.1:8787/planning?date=2025-08-
 ### 桌面小组件使用
 
 #### 交互特性
+
 1. **实时编辑**：点击任意任务直接编辑内容
 2. **任务状态**：支持 `- [x]` 标记完成，`- [ ]` 标记待办
 3. **快速添加**：底部输入框快速添加新任务
@@ -169,6 +182,7 @@ curl -H "X-Auth: your-secret-token" http://127.0.0.1:8787/planning?date=2025-08-
 5. **自动保存**：失去焦点时自动保存到Obsidian
 
 #### 可视化特性
+
 - ✅ 已完成任务：绿色勾选标识
 - ⚪ 待办任务：空心圆圈
 - 📅 日期显示：顶部显示当前日期
@@ -213,12 +227,13 @@ const styles = {
 ### API端点扩展
 
 #### 添加任务搜索功能
+
 ```python
 @app.get("/search")
 async def search_tasks(query: str, x_auth: str = Header(...)):
     if x_auth != AUTH_TOKEN:
         raise HTTPException(status_code=403, detail="Invalid token")
-    
+  
     results = []
     for filename in glob.glob(os.path.join(DAILY_NOTES_DIR, "*.md")):
         with open(filename, 'r', encoding='utf-8') as f:
@@ -229,7 +244,7 @@ async def search_tasks(query: str, x_auth: str = Header(...)):
                     "matches": [line for line in content.split('\n') 
                                if query.lower() in line.lower()]
                 })
-    
+  
     return {"results": results}
 ```
 
@@ -238,6 +253,7 @@ async def search_tasks(query: str, x_auth: str = Header(...)):
 ### 本地开发环境
 
 #### 手动启动服务端
+
 ```bash
 # 进入项目目录
 cd ~/obsidian-plan-server
@@ -247,6 +263,7 @@ uvicorn obs_plan_server:app --host 127.0.0.1 --port 8787 --reload --log-level de
 ```
 
 #### 测试API
+
 ```bash
 # 测试获取计划
 curl -H "X-Auth: your-secret-token" "http://127.0.0.1:8787/planning?date=2025-08-08"
@@ -260,11 +277,13 @@ curl -X POST -H "X-Auth: your-secret-token" -H "Content-Type: application/x-www-
 ## 📊 性能优化
 
 ### 启动优化
+
 - **预热加载**：设置LaunchAgent为KeepAlive，减少冷启动时间
 - **日志精简**：生产环境使用 `log-level warning`
 - **缓存策略**：前端组件每30秒自动刷新
 
 ### 存储优化
+
 - **文件监控**：使用macOS的FSEvents监控文件变化
 - **增量更新**：仅同步变化的部分，减少IO操作
 - **备份机制**：每日自动备份历史文件
@@ -272,6 +291,7 @@ curl -X POST -H "X-Auth: your-secret-token" -H "Content-Type: application/x-www-
 ## 🎯 扩展规划
 
 ### 下一步功能
+
 - [ ] 周视图/月视图切换
 - [ ] 任务优先级（高/中/低）支持
 - [ ] 番茄钟集成
@@ -280,6 +300,7 @@ curl -X POST -H "X-Auth: your-secret-token" -H "Content-Type: application/x-www-
 - [ ] 语音输入支持
 
 ### 移动端考虑
+
 - 通过**快捷指令**实现iOS快捷输入
 - **快捷指令模板**：接收输入→调用API→保存到Obsidian
 
@@ -294,5 +315,5 @@ curl -X POST -H "X-Auth: your-secret-token" -H "Content-Type: application/x-www-
 
 > 💡 **小贴士**：保持简洁，专注当下。每天只列出3-5个最重要的任务，避免计划过载。
 
-**Last Updated**: 2025-08-08  
+**Last Updated**: 2025-08-08
 **版本**: v1.0.0-beta

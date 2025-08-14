@@ -93,14 +93,8 @@ function PlanInner() {
 
   React.useEffect(() => {
     load();
-    // 只在非编辑状态下自动刷新，避免丢失编辑内容
-    const timer = setInterval(() => {
-      if (!editing) {
-        load();
-      }
-    }, 60000); // Auto-refresh every 60s only when not editing
-    return () => clearInterval(timer);
-  }, [load, editing]);
+    // 取消自动刷新功能
+  }, [load]);
 
   const onSave = async () => {
     try {
@@ -206,6 +200,9 @@ function PlanInner() {
       <div className="controls">
         {!editing ? (
           <>
+            <Btn onClick={load} className="btn-refresh" title="Refresh" disabled={state.loading}>
+              ↻
+            </Btn>
             <Btn onClick={() => setEditing(true)}>Edit</Btn>
             {state.file && (
               <Btn onClick={openInObsidian} className="btn-obsidian" title="Open in Obsidian">
@@ -353,6 +350,24 @@ function PlanInner() {
         .btn.btn-obsidian:hover {
           background: linear-gradient(135deg, #6d28d9, #5b21b6);
           box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+        }
+        .btn.btn-refresh {
+          background: linear-gradient(135deg, #3b82f6, #2563eb);
+          border: 1px solid rgba(59, 130, 246, 0.3);
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: bold;
+          min-width: 32px;
+          padding: 6px 8px;
+        }
+        .btn.btn-refresh:hover {
+          background: linear-gradient(135deg, #2563eb, #1d4ed8);
+          transform: translateY(-1px) rotate(180deg);
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+          transition: all 0.3s ease;
+        }
+        .btn.btn-refresh:active {
+          transform: translateY(0px) rotate(360deg);
         }
         .content-area {
           padding: 16px 20px;
