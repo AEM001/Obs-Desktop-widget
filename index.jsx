@@ -7,8 +7,10 @@ const DATE_OFFSET_DAYS = 0; // 0=Today, -1=Yesterday
 
 // === Main Component: Styles ===
 export const className = `
-  right: 20px;
-  top: 20px;
+  position: fixed;
+  left: 50%;
+  top: 35px;
+  transform: translateX(-50%);
   width: 380px;
   max-height: 75vh;
   background: linear-gradient(145deg, rgba(240, 248, 255, 0.95), rgba(230, 245, 255, 0.98));
@@ -28,6 +30,7 @@ export const className = `
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
+  z-index: 1000;
 `;
 export const refreshFrequency = false; // Use manual refresh
 
